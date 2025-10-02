@@ -1,8 +1,8 @@
 # Crypto-Trade-Bot
 Binance Futures Testnet Trading Bot
 A simplified, well-structured Python trading bot for Binance Futures Testnet with comprehensive logging and error handling.
-📋 Features
-✅ Core Requirements
+ Features
+ Core Requirements
 
 Market orders (instant execution at current price)
 Limit orders (execute at specific price or better)
@@ -12,14 +12,14 @@ Comprehensive logging to file and console
 Detailed error handling
 Real-time order status tracking
 
-✅ Bonus Features
+  Bonus Features
 
 Stop-Limit orders (advanced order type)
 Account balance monitoring
 Open orders management
 Order cancellation functionality
 
-🚀 Quick Start
+  Quick Start
 1. Install Dependencies
 bashpip install python-binance
 2. Set Up Binance Testnet Account
@@ -62,7 +62,7 @@ Triggers a limit order when stop price is reached
 Best for: Stop-losses, breakout trading
 Example: If BTC drops to $59,000 (stop), sell at $58,900 (limit)
 
-💡 Usage Examples
+ Usage Examples
 Example 1: Place a Market Buy Order
 Select option: 1
 Enter symbol: BTCUSDT
@@ -84,7 +84,7 @@ Enter quantity: 0.001
 Enter stop price: 59000    # Triggers when price hits this
 Enter limit price: 58900   # Executes at this price
 Confirm? yes
-📊 Understanding the Logs
+ Understanding the Logs
 The bot creates timestamped log files: trading_bot_YYYYMMDD_HHMMSS.log
 Log levels:
 
@@ -129,7 +129,7 @@ Specific handling for BinanceAPIException
 Detailed error logging
 User-friendly error messages
 
-🎯 Best Practices Demonstrated
+  Best Practices Demonstrated
 
 Separation of Concerns: Each function has one clear purpose
 Comprehensive Logging: All actions are logged with timestamps
@@ -139,7 +139,7 @@ Code Documentation: Clear docstrings for all functions
 User Confirmation: Critical actions require explicit confirmation
 Testnet Safety: Defaults to testnet to prevent accidental live trading
 
-🐛 Common Issues & Solutions
+   Common Issues & Solutions
 Issue 1: "API connection failed"
 Solution: Verify your API key and secret are correct, and your IP is whitelisted on Binance Testnet
 Issue 2: "Insufficient balance"
@@ -148,17 +148,17 @@ Issue 3: "Symbol not found"
 Solution: Use correct symbol format (e.g., BTCUSDT not BTC-USDT)
 Issue 4: "Order would immediately trigger"
 Solution: For limit orders, ensure buy price is below current price and sell price is above
-📦 Deliverables Checklist
-✅ Python code with all required features
-✅ Support for Market and Limit orders
-✅ BUY and SELL functionality
-✅ CLI interface with input validation
-✅ Comprehensive logging to file
-✅ Error handling throughout
-✅ Bonus: Stop-Limit orders
-✅ Clean, documented, reusable code
-✅ README with setup instructions
-📝 Testing Checklist
+ Deliverables Checklist
+ Python code with all required features
+ Support for Market and Limit orders
+ BUY and SELL functionality
+ CLI interface with input validation
+ Comprehensive logging to file
+ Error handling throughout
+ Bonus: Stop-Limit orders
+ Clean, documented, reusable code
+ README with setup instructions
+ Testing Checklist
 Before submitting, test:
 
  Bot initializes with your API credentials
@@ -175,7 +175,7 @@ Before submitting, test:
  Log file is created with all activities
  Error handling works (try invalid symbol)
 
-🎓 Learning Outcomes
+   Learning Outcomes
 This project demonstrates:
 
 API integration with financial services
