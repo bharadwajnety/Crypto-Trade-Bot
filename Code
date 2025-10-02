@@ -1,0 +1,478 @@
+from binance.client import Client
+from binance.exceptions import BinanceAPIException
+import logging
+from datetime import datetime
+import json
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'trading_bot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+
+class BasicBot:
+    """
+    A simplified trading bot for Binance Futures Testnet
+    Supports market orders, limit orders, and stop-limit orders
+    """
+    
+    def __init__(self, api_key, api_secret, testnet=True):
+        """
+        Initialize the trading bot with API credentials
+        
+        Args:
+            api_key (str): Binance API key
+            api_secret (str): Binance API secret
+            testnet (bool): Use testnet if True, live trading if False
+        """
+        try:
+            self.client = Client(api_key, api_secret, testnet=testnet)
+            if testnet:
+                self.client.API_URL = 'https://testnet.binancefuture.com'
+            
+            logger.info("Bot initialized successfully")
+            logger.info(f"Using {'TESTNET' if testnet else 'LIVE'} environment")
+            
+            # Test connection
+            self._test_connection()
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize bot: {str(e)}")
+            raise
+    
+    def _test_connection(self):
+        """Test API connection and log account information"""
+        try:
+            account_info = self.client.futures_account()
+            logger.info("Connection successful!")
+            logger.info(f"Account balance: {account_info.get('totalWalletBalance', 'N/A')} USDT")
+        except BinanceAPIException as e:
+            logger.error(f"API connection failed: {e.message}")
+            raise
+    
+    def get_symbol_info(self, symbol):
+        """
+        Get trading rules and information for a symbol
+        
+        Args:
+            symbol (str): Trading pair symbol (e.g., 'BTCUSDT')
+        
+        Returns:
+            dict: Symbol information including price precision, quantity precision, etc.
+        """
+        try:
+            exchange_info = self.client.futures_exchange_info()
+            for s in exchange_info['symbols']:
+                if s['symbol'] == symbol.upper():
+                    logger.info(f"Symbol info retrieved for {symbol}")
+                    return s
+            logger.warning(f"Symbol {symbol} not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting symbol info: {str(e)}")
+            return None
+    
+    def get_current_price(self, symbol):
+        """
+        Get current market price for a symbol
+        
+        Args:
+            symbol (str): Trading pair symbol
+        
+        Returns:
+            float: Current price
+        """
+        try:
+            ticker = self.client.futures_symbol_ticker(symbol=symbol.upper())
+            price = float(ticker['price'])
+            logger.info(f"Current {symbol} price: {price}")
+            return price
+        except Exception as e:
+            logger.error(f"Error getting price: {str(e)}")
+            return None
+    
+    def place_market_order(self, symbol, side, quantity):
+        """
+        Place a market order (executes immediately at current market price)
+        
+        Args:
+            symbol (str): Trading pair (e.g., 'BTCUSDT')
+            side (str): 'BUY' or 'SELL'
+            quantity (float): Amount to trade
+        
+        Returns:
+            dict: Order response or None if failed
+        """
+        try:
+            logger.info(f"Placing MARKET {side} order for {quantity} {symbol}")
+            
+            order = self.client.futures_create_order(
+                symbol=symbol.upper(),
+                side=side.upper(),
+                type='MARKET',
+                quantity=quantity
+            )
+            
+            logger.info(f"Market order placed successfully!")
+            logger.info(f"Order ID: {order['orderId']}")
+            logger.info(f"Status: {order['status']}")
+            logger.info(json.dumps(order, indent=2))
+            
+            return order
+            
+        except BinanceAPIException as e:
+            logger.error(f"Binance API Error: {e.message}")
+            return None
+        except Exception as e:
+            logger.error(f"Error placing market order: {str(e)}")
+            return None
+    
+    def place_limit_order(self, symbol, side, quantity, price):
+        """
+        Place a limit order (executes only at specified price or better)
+        
+        Args:
+            symbol (str): Trading pair
+            side (str): 'BUY' or 'SELL'
+            quantity (float): Amount to trade
+            price (float): Limit price
+        
+        Returns:
+            dict: Order response or None if failed
+        """
+        try:
+            logger.info(f"Placing LIMIT {side} order for {quantity} {symbol} at {price}")
+            
+            order = self.client.futures_create_order(
+                symbol=symbol.upper(),
+                side=side.upper(),
+                type='LIMIT',
+                timeInForce='GTC',  # Good Till Cancelled
+                quantity=quantity,
+                price=price
+            )
+            
+            logger.info(f"Limit order placed successfully!")
+            logger.info(f"Order ID: {order['orderId']}")
+            logger.info(f"Status: {order['status']}")
+            logger.info(json.dumps(order, indent=2))
+            
+            return order
+            
+        except BinanceAPIException as e:
+            logger.error(f"Binance API Error: {e.message}")
+            return None
+        except Exception as e:
+            logger.error(f"Error placing limit order: {str(e)}")
+            return None
+    
+    def place_stop_limit_order(self, symbol, side, quantity, stop_price, limit_price):
+        """
+        Place a stop-limit order (triggers limit order when stop price is reached)
+        
+        Args:
+            symbol (str): Trading pair
+            side (str): 'BUY' or 'SELL'
+            quantity (float): Amount to trade
+            stop_price (float): Price that triggers the limit order
+            limit_price (float): Limit price for execution
+        
+        Returns:
+            dict: Order response or None if failed
+        """
+        try:
+            logger.info(f"Placing STOP_LIMIT {side} order for {quantity} {symbol}")
+            logger.info(f"Stop Price: {stop_price}, Limit Price: {limit_price}")
+            
+            order = self.client.futures_create_order(
+                symbol=symbol.upper(),
+                side=side.upper(),
+                type='STOP',
+                timeInForce='GTC',
+                quantity=quantity,
+                price=limit_price,
+                stopPrice=stop_price
+            )
+            
+            logger.info(f"Stop-limit order placed successfully!")
+            logger.info(f"Order ID: {order['orderId']}")
+            logger.info(f"Status: {order['status']}")
+            logger.info(json.dumps(order, indent=2))
+            
+            return order
+            
+        except BinanceAPIException as e:
+            logger.error(f"Binance API Error: {e.message}")
+            return None
+        except Exception as e:
+            logger.error(f"Error placing stop-limit order: {str(e)}")
+            return None
+    
+    def get_order_status(self, symbol, order_id):
+        """
+        Check the status of an order
+        
+        Args:
+            symbol (str): Trading pair
+            order_id (int): Order ID
+        
+        Returns:
+            dict: Order status information
+        """
+        try:
+            order = self.client.futures_get_order(symbol=symbol.upper(), orderId=order_id)
+            logger.info(f"Order {order_id} status: {order['status']}")
+            return order
+        except Exception as e:
+            logger.error(f"Error getting order status: {str(e)}")
+            return None
+    
+    def cancel_order(self, symbol, order_id):
+        """
+        Cancel an open order
+        
+        Args:
+            symbol (str): Trading pair
+            order_id (int): Order ID to cancel
+        
+        Returns:
+            dict: Cancellation response
+        """
+        try:
+            result = self.client.futures_cancel_order(symbol=symbol.upper(), orderId=order_id)
+            logger.info(f"Order {order_id} cancelled successfully")
+            return result
+        except Exception as e:
+            logger.error(f"Error cancelling order: {str(e)}")
+            return None
+    
+    def get_open_orders(self, symbol=None):
+        """
+        Get all open orders
+        
+        Args:
+            symbol (str, optional): Filter by symbol
+        
+        Returns:
+            list: List of open orders
+        """
+        try:
+            if symbol:
+                orders = self.client.futures_get_open_orders(symbol=symbol.upper())
+            else:
+                orders = self.client.futures_get_open_orders()
+            
+            logger.info(f"Found {len(orders)} open orders")
+            return orders
+        except Exception as e:
+            logger.error(f"Error getting open orders: {str(e)}")
+            return []
+    
+    def get_account_balance(self):
+        """
+        Get account balance information
+        
+        Returns:
+            dict: Balance information
+        """
+        try:
+            account = self.client.futures_account()
+            balance = {
+                'total_wallet_balance': account['totalWalletBalance'],
+                'available_balance': account['availableBalance'],
+                'total_unrealized_profit': account['totalUnrealizedProfit']
+            }
+            logger.info(f"Account Balance: {json.dumps(balance, indent=2)}")
+            return balance
+        except Exception as e:
+            logger.error(f"Error getting account balance: {str(e)}")
+            return None
+
+
+def validate_input(prompt, input_type=str, validator=None):
+    """
+    Validate user input with type checking and custom validation
+    
+    Args:
+        prompt (str): Input prompt message
+        input_type (type): Expected type (str, float, int)
+        validator (function): Optional custom validation function
+    
+    Returns:
+        Validated input value
+    """
+    while True:
+        try:
+            value = input(prompt).strip()
+            
+            if input_type == float:
+                value = float(value)
+            elif input_type == int:
+                value = int(value)
+            
+            if validator and not validator(value):
+                print("Invalid input. Please try again.")
+                continue
+            
+            return value
+        except ValueError:
+            print(f"Invalid input. Please enter a valid {input_type.__name__}.")
+        except KeyboardInterrupt:
+            print("\nOperation cancelled by user.")
+            exit(0)
+
+
+def main():
+    """Main function to run the trading bot CLI"""
+    
+    print("=" * 60)
+    print("BINANCE FUTURES TESTNET TRADING BOT")
+    print("=" * 60)
+    print()
+    
+    # Get API credentials
+    print("Please enter your Binance Testnet API credentials:")
+    api_key = input("API Key: ").strip()
+    api_secret = input("API Secret: ").strip()
+    print()
+    
+    # Initialize bot
+    try:
+        bot = BasicBot(api_key, api_secret, testnet=True)
+    except Exception as e:
+        print(f"Failed to initialize bot: {str(e)}")
+        return
+    
+    # Main menu loop
+    while True:
+        print("\n" + "=" * 60)
+        print("MAIN MENU")
+        print("=" * 60)
+        print("1. Place Market Order")
+        print("2. Place Limit Order")
+        print("3. Place Stop-Limit Order (Bonus)")
+        print("4. Check Current Price")
+        print("5. View Open Orders")
+        print("6. Check Order Status")
+        print("7. Cancel Order")
+        print("8. View Account Balance")
+        print("9. Exit")
+        print("=" * 60)
+        
+        choice = validate_input("Select an option (1-9): ", str, lambda x: x in '123456789')
+        
+        if choice == '1':
+            # Market Order
+            print("\n--- PLACE MARKET ORDER ---")
+            symbol = validate_input("Enter symbol (e.g., BTCUSDT): ", str).upper()
+            bot.get_current_price(symbol)
+            side = validate_input("Enter side (BUY/SELL): ", str, lambda x: x.upper() in ['BUY', 'SELL']).upper()
+            quantity = validate_input("Enter quantity: ", float, lambda x: x > 0)
+            
+            confirm = input(f"\nConfirm {side} {quantity} {symbol} at MARKET price? (yes/no): ")
+            if confirm.lower() == 'yes':
+                bot.place_market_order(symbol, side, quantity)
+            else:
+                print("Order cancelled.")
+        
+        elif choice == '2':
+            # Limit Order
+            print("\n--- PLACE LIMIT ORDER ---")
+            symbol = validate_input("Enter symbol (e.g., BTCUSDT): ", str).upper()
+            current_price = bot.get_current_price(symbol)
+            side = validate_input("Enter side (BUY/SELL): ", str, lambda x: x.upper() in ['BUY', 'SELL']).upper()
+            quantity = validate_input("Enter quantity: ", float, lambda x: x > 0)
+            price = validate_input(f"Enter limit price (current: {current_price}): ", float, lambda x: x > 0)
+            
+            confirm = input(f"\nConfirm {side} {quantity} {symbol} at {price}? (yes/no): ")
+            if confirm.lower() == 'yes':
+                bot.place_limit_order(symbol, side, quantity, price)
+            else:
+                print("Order cancelled.")
+        
+        elif choice == '3':
+            # Stop-Limit Order
+            print("\n--- PLACE STOP-LIMIT ORDER ---")
+            symbol = validate_input("Enter symbol (e.g., BTCUSDT): ", str).upper()
+            current_price = bot.get_current_price(symbol)
+            side = validate_input("Enter side (BUY/SELL): ", str, lambda x: x.upper() in ['BUY', 'SELL']).upper()
+            quantity = validate_input("Enter quantity: ", float, lambda x: x > 0)
+            stop_price = validate_input(f"Enter stop price (current: {current_price}): ", float, lambda x: x > 0)
+            limit_price = validate_input("Enter limit price: ", float, lambda x: x > 0)
+            
+            confirm = input(f"\nConfirm {side} {quantity} {symbol} with stop at {stop_price} and limit at {limit_price}? (yes/no): ")
+            if confirm.lower() == 'yes':
+                bot.place_stop_limit_order(symbol, side, quantity, stop_price, limit_price)
+            else:
+                print("Order cancelled.")
+        
+        elif choice == '4':
+            # Check Price
+            print("\n--- CHECK CURRENT PRICE ---")
+            symbol = validate_input("Enter symbol (e.g., BTCUSDT): ", str).upper()
+            bot.get_current_price(symbol)
+        
+        elif choice == '5':
+            # View Open Orders
+            print("\n--- VIEW OPEN ORDERS ---")
+            symbol = input("Enter symbol (press Enter for all): ").strip().upper() or None
+            orders = bot.get_open_orders(symbol)
+            if orders:
+                for order in orders:
+                    print(f"\nOrder ID: {order['orderId']}")
+                    print(f"Symbol: {order['symbol']}")
+                    print(f"Side: {order['side']}")
+                    print(f"Type: {order['type']}")
+                    print(f"Price: {order['price']}")
+                    print(f"Quantity: {order['origQty']}")
+                    print(f"Status: {order['status']}")
+            else:
+                print("No open orders found.")
+        
+        elif choice == '6':
+            # Check Order Status
+            print("\n--- CHECK ORDER STATUS ---")
+            symbol = validate_input("Enter symbol: ", str).upper()
+            order_id = validate_input("Enter order ID: ", int)
+            bot.get_order_status(symbol, order_id)
+        
+        elif choice == '7':
+            # Cancel Order
+            print("\n--- CANCEL ORDER ---")
+            symbol = validate_input("Enter symbol: ", str).upper()
+            order_id = validate_input("Enter order ID: ", int)
+            confirm = input(f"Confirm cancel order {order_id}? (yes/no): ")
+            if confirm.lower() == 'yes':
+                bot.cancel_order(symbol, order_id)
+            else:
+                print("Cancellation aborted.")
+        
+        elif choice == '8':
+            # View Balance
+            print("\n--- ACCOUNT BALANCE ---")
+            bot.get_account_balance()
+        
+        elif choice == '9':
+            # Exit
+            print("\nThank you for using the trading bot!")
+            logger.info("Bot session ended")
+            break
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nBot terminated by user.")
+        logger.info("Bot terminated by user")
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        print(f"\nAn error occurred: {str(e)}")
